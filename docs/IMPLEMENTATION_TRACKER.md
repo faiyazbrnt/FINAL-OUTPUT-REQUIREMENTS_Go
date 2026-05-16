@@ -2,15 +2,15 @@
 
 ## Phase 0 - Setup
 1. [x] Create monorepo folder structure
-2. [ ] Initialize git repository
-3. [ ] Push initial scaffold to GitHub
+2. [x] Initialize git repository
+3. [x] Push initial scaffold to GitHub
 
-## Phase 1 - Data
-1. [ ] Select approved public dataset (500-1000 rows)
-2. [ ] Save raw CSV to `dataset/raw/`
-3. [ ] Document metadata in `dataset/data_dictionary.md`
-4. [ ] Run Python cleaning script
-5. [ ] Save cleaned CSV to `dataset/cleaned/`
+## Phase 1 - Data [x]
+1. [x] Select approved public dataset (500-1000 rows) - **Titanic (Kaggle train.csv, 891 rows, 12 columns)**: https://www.kaggle.com/c/titanic/data
+2. [x] Save raw CSV to `dataset/raw/`
+3. [x] Document metadata in `dataset/data_dictionary.md`
+4. [x] Run Python cleaning script
+5. [x] Save cleaned CSV to `dataset/cleaned/`
 
 ## Phase 2 - Database
 1. [ ] Create Supabase project
