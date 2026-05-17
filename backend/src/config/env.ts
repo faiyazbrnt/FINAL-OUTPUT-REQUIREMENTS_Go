@@ -1,7 +1,8 @@
 import { config } from "dotenv";
 import { z } from "zod";
 
-config();
+config({ path: ".env" });
+config({ path: ".env.local", override: true });
 
 const trimString = (value: unknown): unknown => {
   if (typeof value !== "string") {
