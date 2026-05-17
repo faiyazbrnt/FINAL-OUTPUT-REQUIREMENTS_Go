@@ -18,7 +18,18 @@ export const validate =
       return;
     }
 
-    (req as Request & Record<Source, unknown>)[source] = result.data;
+    if (source === "body") {
+      req.body = result.data;
+      next();
+      return;
+    }
+
+    const target = req[source] as Record<string, unknown>;
+    for (const key of Object.keys(target)) {
+      delete target[key];
+    }
+    Object.assign(target, result.data as Record<string, unknown>);
+
     next();
   };
 

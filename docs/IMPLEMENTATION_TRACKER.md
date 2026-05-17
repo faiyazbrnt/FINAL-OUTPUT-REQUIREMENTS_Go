@@ -26,11 +26,11 @@
 5. [x] Test endpoints locally
 
 ## Phase 4 - Frontend
-1. [ ] Scaffold React + Vite + TS + Tailwind
-2. [ ] Build KPI cards + filters + charts
-3. [ ] Connect backend APIs
-4. [ ] Add AI insight panel
-5. [ ] Validate responsive behavior
+1. [x] Scaffold React + Vite + TS + Tailwind
+2. [x] Build KPI cards + filters + charts
+3. [x] Connect backend APIs
+4. [x] Add AI insight panel
+5. [x] Validate responsive behavior
 
 ## Phase 5 - Deployment
 1. [ ] Deploy backend to Render

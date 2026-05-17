@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f4f7fb;
+  --surface: #ffffff;
+  --surface-soft: #eef3fb;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --border: #d6deeb;
+  --brand: #155eef;
+  --brand-soft: #dce7ff;
+  --accent: #0f9f8f;
+  --warn: #b42318;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  background: radial-gradient(circle at top left, #eaf0ff 0%, var(--bg) 45%, #f7fafc 100%);
+  color: var(--text);
+  font-family: "Segoe UI", "Trebuchet MS", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+a,
+button,
+select,
+input {
+  outline-color: var(--brand);
+}
+
+.dashboard-shell {
+  min-height: 100vh;
+  padding: 1.25rem;
+}
+
+.dashboard-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.panel {
+  background: linear-gradient(160deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.chart-wrap {
+  height: 280px;
+}
+
+@media (min-width: 768px) {
+  .dashboard-shell {
+    padding: 1.75rem;
+  }
+}
