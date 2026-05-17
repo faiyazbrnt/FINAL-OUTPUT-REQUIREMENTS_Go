@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "installCommand": "npm ci",
-  "buildCommand": "npm run build -w frontend",
+  "installCommand": "npm ci --include=dev --include=optional --prefix frontend && npm i --prefix frontend @rollup/rollup-linux-x64-gnu@4.60.4 lightningcss-linux-x64-gnu@1.32.0 @tailwindcss/oxide-linux-x64-gnu@4.3.0 --no-save",
+  "buildCommand": "node -v && npm run build --prefix frontend -- --debug",
   "outputDirectory": "frontend/dist",
   "rewrites": [
     {
