@@ -30,6 +30,12 @@ export type AgeTrend = {
 export type InsightResponse = {
   insight: string;
   fallbackUsed: boolean;
+  structuredInsights?: Array<{
+    title: string;
+    description: string;
+    wordCount: number;
+  }>;
+  recommendations?: string[];
 };
 
 export type DashboardSummary = {
