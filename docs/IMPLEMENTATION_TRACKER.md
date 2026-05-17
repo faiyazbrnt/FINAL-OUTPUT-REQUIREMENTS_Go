@@ -19,11 +19,11 @@
 4. [x] Validate counts and sample queries (run: `database/phase2_titanic_validation_queries.sql`)
 
 ## Phase 3 - Backend
-1. [ ] Scaffold Express + TS app
-2. [ ] Add analytics routes
-3. [ ] Add AI insight route
-4. [ ] Add validation, error handling, CORS
-5. [ ] Test endpoints locally
+1. [x] Scaffold Express + TS app
+2. [x] Add analytics routes
+3. [x] Add AI insight route
+4. [x] Add validation, error handling, CORS
+5. [x] Test endpoints locally
 
 ## Phase 4 - Frontend
 1. [ ] Scaffold React + Vite + TS + Tailwind
