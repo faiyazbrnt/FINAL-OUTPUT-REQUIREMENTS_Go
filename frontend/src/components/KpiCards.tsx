@@ -34,12 +34,14 @@ const KpiCards = ({ kpis }: KpiCardsProps): JSX.Element => {
   ];
 
   return (
-    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Key metrics">
+    <section className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4" aria-label="Key metrics">
       {cards.map((card) => (
-        <article key={card.title} className="panel p-4 md:p-5">
-          <h3 className="text-sm font-medium text-slate-500">{card.title}</h3>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{card.value}</p>
-          <p className="mt-2 text-sm text-slate-600">{card.helper}</p>
+        <article key={card.title} className="panel kpi-card p-4 md:p-5">
+          <header>
+            <h3 className="kpi-title">{card.title}</h3>
+          </header>
+          <p className="kpi-value">{card.value}</p>
+          <p className="kpi-helper">{card.helper}</p>
         </article>
       ))}
     </section>
