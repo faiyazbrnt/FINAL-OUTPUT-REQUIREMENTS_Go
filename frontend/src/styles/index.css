@@ -372,6 +372,58 @@ input {
   box-shadow: 0 0 0 4px rgba(31, 95, 224, 0.16);
 }
 
+.header-meta-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.multi-timezone-clock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid #c8d8ee;
+  border-radius: 0.75rem;
+  background: rgba(227, 236, 255, 0.68);
+  padding: 0.42rem 0.62rem;
+}
+
+.clock-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: #2a456f;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.clock-row + .clock-row {
+  border-top: 1px dashed rgba(24, 64, 139, 0.2);
+  padding-top: 0.2rem;
+}
+
+.clock-label {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.clock-value {
+  color: #18408b;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.clock-zone {
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+}
+
 .status-panel {
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
@@ -597,6 +649,10 @@ input {
 
   .kpi-card {
     padding: 1.12rem;
+  }
+
+  .header-meta-wrap {
+    align-items: flex-end;
   }
 }
 
