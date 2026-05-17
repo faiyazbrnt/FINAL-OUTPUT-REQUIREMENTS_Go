@@ -13,8 +13,18 @@ type ApiResponse<T> = {
   data: T;
 };
 
+const isLocalHostname = (hostname: string): boolean => hostname === "localhost" || hostname === "127.0.0.1";
+
+const getDefaultApiBaseUrl = (): string => {
+  if (typeof window !== "undefined" && !isLocalHostname(window.location.hostname)) {
+    return "https://datainsights-backend.onrender.com/api";
+  }
+
+  return "http://localhost:5000/api";
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api",
+  baseURL: import.meta.env.VITE_API_BASE_URL || getDefaultApiBaseUrl(),
   timeout: 15000
 });
 

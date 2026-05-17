@@ -1,15 +1,19 @@
 import { config } from "dotenv";
 import { z } from "zod";
 
-// Support running from either repo root or backend directory.
-config({ path: ".env" });
-config({ path: "../.env" });
-config({ path: "backend/.env" });
+const isProduction = process.env.NODE_ENV === "production";
 
-// Local overrides win regardless of where the dev command is run from.
-config({ path: ".env.local", override: true });
-config({ path: "../.env.local", override: true });
-config({ path: "backend/.env.local", override: true });
+if (!isProduction) {
+  // Support running from either repo root or backend directory in local dev.
+  config({ path: ".env" });
+  config({ path: "../.env" });
+  config({ path: "backend/.env" });
+
+  // Local overrides win in development only.
+  config({ path: ".env.local", override: true });
+  config({ path: "../.env.local", override: true });
+  config({ path: "backend/.env.local", override: true });
+}
 
 const trimString = (value: unknown): unknown => {
   if (typeof value !== "string") {
