@@ -6,12 +6,21 @@ type RegionalPieChartProps = {
 };
 
 const colors = ["#155eef", "#0f9f8f", "#f79009", "#f04438", "#6941c6", "#1570ef"];
+const tooltipStyle = {
+  borderRadius: 12,
+  borderColor: "#d5dfec",
+  boxShadow: "0 10px 22px rgba(14,35,75,0.14)",
+  backgroundColor: "#ffffff"
+};
 
 const RegionalPieChart = ({ data }: RegionalPieChartProps): JSX.Element => {
   return (
     <section className="panel p-4 md:p-5" aria-label="Regional distribution pie chart">
       <div className="panel-header">
-        <h2 className="text-base font-semibold">Embarkation Distribution</h2>
+        <div>
+          <h2 className="section-title">Embarkation Distribution</h2>
+          <p className="section-subtitle">Share percentage by boarding region.</p>
+        </div>
       </div>
 
       <div className="chart-wrap">
@@ -22,8 +31,11 @@ const RegionalPieChart = ({ data }: RegionalPieChartProps): JSX.Element => {
                 <Cell key={entry.region} fill={colors[Math.abs(entry.region.length) % colors.length]} />
               ))}
             </Pie>
-            <Tooltip formatter={(value: number) => `${value}%`} />
-            <Legend />
+            <Tooltip
+              formatter={(value: number) => `${value}%`}
+              contentStyle={tooltipStyle}
+            />
+            <Legend wrapperStyle={{ fontSize: "0.82rem", color: "#405372" }} />
           </PieChart>
         </ResponsiveContainer>
       </div>
