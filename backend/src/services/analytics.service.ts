@@ -1,5 +1,5 @@
 import { type SupabaseClient } from "@supabase/supabase-js";
-import { isSupabaseConfigured, supabase } from "../config/supabase";
+import { isSupabaseConfigured, supabase, supabaseDiagnostics } from "../config/supabase";
 import { AppError } from "../utils/httpError";
 
 type TitanicPassenger = {
@@ -26,6 +26,34 @@ const percent = (part: number, whole: number): number => {
 
 const getSupabaseClient = (): SupabaseClient => {
   if (!isSupabaseConfigured || !supabase) {
+    if (!supabaseDiagnostics.supabaseUrlExists) {
+      console.error("[analytics] Supabase URL is missing.");
+      throw new AppError(
+        "Supabase credentials are missing. Update backend/.env with valid Supabase values.",
+        500,
+        "SUPABASE_MISSING_URL"
+      );
+    }
+
+    if (!supabaseDiagnostics.supabaseUrlFormatValid) {
+      console.error("[analytics] Supabase URL format is invalid.");
+      throw new AppError(
+        "Supabase credentials are missing. Update backend/.env with valid Supabase values.",
+        500,
+        "SUPABASE_INVALID_URL"
+      );
+    }
+
+    if (!supabaseDiagnostics.supabaseKeyExists) {
+      console.error("[analytics] Supabase key is missing.");
+      throw new AppError(
+        "Supabase credentials are missing. Update backend/.env with valid Supabase values.",
+        500,
+        "SUPABASE_MISSING_KEY"
+      );
+    }
+
+    console.error("[analytics] Supabase client is unavailable due to configuration state.");
     throw new AppError(
       "Supabase credentials are missing. Update backend/.env with valid Supabase values.",
       500,
@@ -57,6 +85,55 @@ const getErrorDetails = (error: unknown): string => {
   return String(error);
 };
 
+const getErrorCode = (error: unknown): string | undefined => {
+  if (!(error instanceof Error)) {
+    return undefined;
+  }
+
+  const directCode = (error as Error & { code?: string }).code;
+  if (directCode) {
+    return directCode;
+  }
+
+  const cause = (error as Error & { cause?: unknown }).cause;
+  if (cause && typeof cause === "object") {
+    return (cause as { code?: string }).code;
+  }
+
+  return undefined;
+};
+
+const classifyFetchFailure = (error: unknown): { errorCode: string; logReason: string } => {
+  const details = getErrorDetails(error).toLowerCase();
+  const code = getErrorCode(error)?.toUpperCase();
+
+  if (code === "ERR_INVALID_URL" || details.includes("invalid url")) {
+    return {
+      errorCode: "SUPABASE_INVALID_URL",
+      logReason: "Supabase URL is invalid. Check SUPABASE_URL format."
+    };
+  }
+
+  if (
+    code === "ENOTFOUND" ||
+    code === "EAI_AGAIN" ||
+    code === "ECONNREFUSED" ||
+    code === "ECONNRESET" ||
+    code === "ETIMEDOUT" ||
+    details.includes("fetch failed")
+  ) {
+    return {
+      errorCode: "SUPABASE_NETWORK_ERROR",
+      logReason: "Network request to Supabase failed."
+    };
+  }
+
+  return {
+    errorCode: "SUPABASE_QUERY_ERROR",
+    logReason: "Unexpected Supabase request error."
+  };
+};
+
 const fetchPassengers = async (): Promise<TitanicPassenger[]> => {
   const client = getSupabaseClient();
 
@@ -67,7 +144,37 @@ const fetchPassengers = async (): Promise<TitanicPassenger[]> => {
       .order("passenger_id", { ascending: true });
 
     if (error) {
-      throw new AppError("Failed to fetch analytics data from Supabase.", 500, "SUPABASE_QUERY_ERROR", error.message);
+      const normalizedMessage = error.message.toLowerCase();
+      if (
+        normalizedMessage.includes("invalid api key") ||
+        normalizedMessage.includes("jwt") ||
+        normalizedMessage.includes("permission denied")
+      ) {
+        console.error("[analytics] Supabase authentication/authorization failure.", {
+          message: error.message,
+          hint: error.hint ?? null,
+          code: error.code ?? null
+        });
+        throw new AppError(
+          "Failed to fetch analytics data from Supabase.",
+          500,
+          "SUPABASE_AUTH_ERROR",
+          "Supabase credentials are invalid or missing permissions."
+        );
+      }
+
+      console.error("[analytics] Supabase query returned an error.", {
+        message: error.message,
+        hint: error.hint ?? null,
+        code: error.code ?? null,
+        details: error.details ?? null
+      });
+      throw new AppError(
+        "Failed to fetch analytics data from Supabase.",
+        500,
+        "SUPABASE_QUERY_ERROR",
+        "Supabase query failed. Check server logs for details."
+      );
     }
 
     return (data || []) as TitanicPassenger[];
@@ -76,7 +183,18 @@ const fetchPassengers = async (): Promise<TitanicPassenger[]> => {
       throw error;
     }
 
-    throw new AppError("Failed to fetch analytics data from Supabase.", 500, "SUPABASE_QUERY_ERROR", getErrorDetails(error));
+    const classified = classifyFetchFailure(error);
+    console.error(`[analytics] ${classified.logReason}`, {
+      errorDetails: getErrorDetails(error),
+      errorCode: getErrorCode(error) ?? null
+    });
+
+    throw new AppError(
+      "Failed to fetch analytics data from Supabase.",
+      500,
+      classified.errorCode,
+      "Supabase request failed. Check server logs for details."
+    );
   }
 };
 
