@@ -2,6 +2,8 @@ import axios, { type AxiosError } from "axios";
 import { env } from "../config/env";
 import { AppError } from "../utils/httpError";
 
+type AiProvider = "gemini" | "groq";
+
 const isMissingOrPlaceholder = (value: string, placeholders: string[]): boolean => {
   if (!value) {
     return true;
@@ -18,6 +20,18 @@ const shouldRetry = (error: unknown): boolean => {
   const axiosError = error as AxiosError | undefined;
   const status = axiosError?.response?.status;
   return status === 429 || (status !== undefined && status >= 500);
+};
+
+const formatProviderError = (provider: AiProvider, error: unknown): string => {
+  if (error instanceof AppError) {
+    return `${provider}: ${error.errorCode} (${error.message})`;
+  }
+
+  const axiosError = error as AxiosError | undefined;
+  const status = axiosError?.response?.status;
+  const statusText = axiosError?.response?.statusText;
+  const message = axiosError?.message ?? "Unknown AI provider error";
+  return `${provider}: HTTP ${status ?? "N/A"} ${statusText ?? ""}`.trim() + ` (${message})`;
 };
 
 const extractGeminiText = (payload: unknown): string | null => {
@@ -86,6 +100,41 @@ const generateWithGroq = async (prompt: string): Promise<string> => {
   return text.trim();
 };
 
+const providerHasUsableKey = (provider: AiProvider): boolean => {
+  if (provider === "gemini") {
+    return !isMissingOrPlaceholder(env.GEMINI_API_KEY, ["your_gemini_api_key", "YOUR_GEMINI_API_KEY"]);
+  }
+
+  return !isMissingOrPlaceholder(env.GROQ_API_KEY, ["your_groq_api_key", "YOUR_GROQ_API_KEY"]);
+};
+
+const getProviderOrder = (): AiProvider[] => {
+  const preferred = env.AI_PROVIDER;
+  const secondary: AiProvider = preferred === "groq" ? "gemini" : "groq";
+
+  const order = [preferred, secondary].filter((provider) => providerHasUsableKey(provider));
+  return order.length > 0 ? order : [preferred, secondary];
+};
+
+const runWithRetry = async (provider: AiProvider, prompt: string): Promise<string> => {
+  const generate = provider === "groq" ? generateWithGroq : generateWithGemini;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await generate(prompt);
+    } catch (error) {
+      if (attempt === 0 && shouldRetry(error)) {
+        await delay(700);
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw new AppError("AI service failed unexpectedly.", 500, "AI_ERROR");
+};
+
 export const buildInsightPrompt = (summary: unknown, maxWords: number): string => {
   return [
     "You are a business analyst for DataInsights Corp.",
@@ -102,25 +151,20 @@ export const buildInsightPrompt = (summary: unknown, maxWords: number): string =
 
 export const generateAiInsight = async (summary: unknown, maxWords: number): Promise<{ insight: string; fallbackUsed: boolean }> => {
   const prompt = buildInsightPrompt(summary, maxWords);
+  const providerOrder = getProviderOrder();
+  const errors: string[] = [];
 
   try {
-    const generate = env.AI_PROVIDER === "groq" ? generateWithGroq : generateWithGemini;
-
-    for (let attempt = 0; attempt < 2; attempt += 1) {
+    for (const provider of providerOrder) {
       try {
-        const insight = await generate(prompt);
+        const insight = await runWithRetry(provider, prompt);
         return { insight, fallbackUsed: false };
       } catch (error) {
-        if (attempt === 0 && shouldRetry(error)) {
-          await delay(700);
-          continue;
-        }
-
-        throw error;
+        errors.push(formatProviderError(provider, error));
       }
     }
 
-    throw new AppError("AI service failed unexpectedly.", 500, "AI_ERROR");
+    throw new AppError(`All AI providers failed. ${errors.join(" | ")}`, 500, "AI_ERROR");
   } catch (error) {
     console.error("AI generation failed:", error);
     return {
