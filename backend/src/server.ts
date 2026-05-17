@@ -10,13 +10,48 @@ import { AppError } from "./utils/httpError";
 const app = express();
 
 const allowedOrigins = env.FRONTEND_URL.split(",")
-  .map((origin) => origin.trim())
+  .map((origin) => origin.trim().toLowerCase())
   .filter(Boolean);
+
+const normalizeOrigin = (origin: string): string => {
+  try {
+    const parsed = new URL(origin);
+    return `${parsed.protocol}//${parsed.host}`.toLowerCase();
+  } catch {
+    return origin.toLowerCase();
+  }
+};
+
+const wildcardToRegex = (pattern: string): RegExp => {
+  const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regexPattern = `^${escaped.replace(/\\\*/g, ".*")}$`;
+  return new RegExp(regexPattern);
+};
+
+const isOriginAllowed = (origin: string): boolean => {
+  const normalizedOrigin = normalizeOrigin(origin);
+
+  for (const allowedOrigin of allowedOrigins) {
+    if (allowedOrigin.includes("*")) {
+      const matcher = wildcardToRegex(allowedOrigin);
+      if (matcher.test(normalizedOrigin)) {
+        return true;
+      }
+      continue;
+    }
+
+    if (normalizedOrigin === normalizeOrigin(allowedOrigin)) {
+      return true;
+    }
+  }
+
+  return false;
+};
 
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || isOriginAllowed(origin)) {
         callback(null, true);
         return;
       }

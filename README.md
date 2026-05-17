@@ -4,6 +4,7 @@ Start here:
 1. SOP: `docs/SOP_AI_Powered_Big_Data_Cloud_Analytics_Dashboard.md`
 2. Implementation tracker: `docs/IMPLEMENTATION_TRACKER.md`
 3. Report template: `docs/README_TEMPLATE.md`
+4. Deployment guide: `docs/DEPLOYMENT.md`
 
 Key folders:
 - `frontend/` React + Vite + TypeScript + Tailwind
