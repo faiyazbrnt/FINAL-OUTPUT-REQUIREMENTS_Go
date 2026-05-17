@@ -6,13 +6,15 @@ import { generateAiInsight } from "../services/ai.service";
 export const generateInsight = asyncHandler(async (req: Request, res: Response) => {
   const body = req.body as { summary?: Record<string, unknown>; maxWords: number };
   const summary = body.summary ?? (await getAnalyticsSummary());
-  const { insight, fallbackUsed } = await generateAiInsight(summary, body.maxWords);
+  const { insight, fallbackUsed, structuredInsights, recommendations } = await generateAiInsight(summary, body.maxWords);
 
   res.status(200).json({
     success: true,
     data: {
       insight,
-      fallbackUsed
+      fallbackUsed,
+      structuredInsights,
+      recommendations
     }
   });
 });

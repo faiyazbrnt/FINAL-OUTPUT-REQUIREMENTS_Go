@@ -4,6 +4,24 @@ import { AppError } from "../utils/httpError";
 
 type AiProvider = "gemini" | "groq";
 
+type InsightTitle = "Key Trend" | "Top Driver" | "Potential Anomaly";
+
+type StructuredInsight = {
+  title: InsightTitle;
+  description: string;
+  wordCount: number;
+};
+
+type NormalizedInsightPayload = {
+  insight: string;
+  structuredInsights: StructuredInsight[];
+  recommendations: string[];
+};
+
+const insightTitleOrder: InsightTitle[] = ["Key Trend", "Top Driver", "Potential Anomaly"];
+
+const fallbackRecommendationMessage = "No actionable recommendations available for this dataset.";
+
 const isMissingOrPlaceholder = (value: string, placeholders: string[]): boolean => {
   if (!value) {
     return true;
@@ -76,6 +94,190 @@ const numberOrZero = (value: unknown): number => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const countWords = (text: string): number => {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+};
+
+const normalizeWhitespace = (text: string): string => {
+  return text.replace(/\s+/g, " ").trim();
+};
+
+const sanitizeMarkdownArtifacts = (rawText: string): string => {
+  return rawText
+    .replace(/\r/g, "")
+    .replace(/```/g, "")
+    .replace(/#{1,6}\s*/g, "")
+    .replace(/\*\*/g, "")
+    .replace(/^\s*\*\*\s*$/gm, "")
+    .replace(/^\s*[-*]{1,3}\s*$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+};
+
+const sanitizeDescription = (rawText: string): string => {
+  return sanitizeMarkdownArtifacts(rawText)
+    .split("\n")
+    .map((line) => line.replace(/^\s*(?:[-*]+|\d+[\).\s-]+|[A-Z][\).\s-]+)\s*/, "").trim())
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+};
+
+const normalizeInsightTitle = (rawTitle: string): InsightTitle | null => {
+  const simplified = rawTitle.toLowerCase().replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
+
+  if (simplified.includes("key trend")) {
+    return "Key Trend";
+  }
+
+  if (simplified.includes("top driver")) {
+    return "Top Driver";
+  }
+
+  if (simplified.includes("potential anomaly")) {
+    return "Potential Anomaly";
+  }
+
+  return null;
+};
+
+const normalizeForParsing = (rawText: string): string => {
+  return sanitizeMarkdownArtifacts(rawText)
+    .replace(/\b1[\)\.\-]?\s*key\s*trend\s*[:\-]?/gi, "\nKey Trend: ")
+    .replace(/\b2[\)\.\-]?\s*top\s*driver\s*[:\-]?/gi, "\nTop Driver: ")
+    .replace(/\b3[\)\.\-]?\s*potential\s*anomaly\s*[:\-]?/gi, "\nPotential Anomaly: ")
+    .replace(/\b4[\)\.\-]?\s*(?:two\s*)?actionable\s*recommendations?\s*[:\-]?/gi, "\nActionable Recommendations: ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+};
+
+const withWordCount = (title: InsightTitle, description: string): StructuredInsight => {
+  const cleanDescription = sanitizeDescription(description);
+  return {
+    title,
+    description: cleanDescription,
+    wordCount: countWords(cleanDescription)
+  };
+};
+
+const extractRecommendations = (rawBlock: string): string[] => {
+  const cleaned = sanitizeMarkdownArtifacts(rawBlock);
+
+  const lineCandidates = cleaned
+    .split("\n")
+    .map((line) => line.replace(/^\s*(?:[-*]+|\d+[\).\s-]+|[A-Z][\).\s-]+)\s*/, "").trim())
+    .filter((line) => line.length > 12 && !/actionable recommendations?/i.test(line));
+
+  const sentenceCandidates = cleaned
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.replace(/^\s*(?:[-*]+|\d+[\).\s-]+|[A-Z][\).\s-]+)\s*/, "").trim())
+    .filter((sentence) => sentence.length > 12 && !/actionable recommendations?/i.test(sentence));
+
+  const unique = new Map<string, string>();
+  for (const candidate of [...lineCandidates, ...sentenceCandidates]) {
+    const normalized = normalizeWhitespace(candidate).toLowerCase();
+    if (!normalized || unique.has(normalized)) {
+      continue;
+    }
+
+    unique.set(normalized, normalizeWhitespace(candidate));
+  }
+
+  return [...unique.values()].slice(0, 3);
+};
+
+const extractStructuredFromText = (rawText: string): { structuredInsights: StructuredInsight[]; recommendations: string[] } => {
+  const normalizedText = normalizeForParsing(rawText);
+
+  const headerRegex = /(^|\n)\s*(Key\s*Trend|Top\s*Driver|Potential\s*Anomaly|Actionable\s*Recommendations?)\s*[:\-]?\s*/gi;
+  const headers: Array<{ title: string; contentStart: number; matchStart: number }> = [];
+
+  let match = headerRegex.exec(normalizedText);
+  while (match) {
+    headers.push({
+      title: match[2],
+      contentStart: headerRegex.lastIndex,
+      matchStart: match.index
+    });
+    match = headerRegex.exec(normalizedText);
+  }
+
+  const structuredInsights: StructuredInsight[] = [];
+  let recommendations: string[] = [];
+
+  if (headers.length === 0) {
+    return { structuredInsights, recommendations };
+  }
+
+  for (let index = 0; index < headers.length; index += 1) {
+    const current = headers[index];
+    const next = headers[index + 1];
+    const block = normalizedText.slice(current.contentStart, next ? next.matchStart : normalizedText.length).trim();
+
+    if (/actionable recommendations?/i.test(current.title)) {
+      recommendations = extractRecommendations(block);
+      continue;
+    }
+
+    const normalizedTitle = normalizeInsightTitle(current.title);
+    const description = sanitizeDescription(block);
+
+    if (!normalizedTitle || !description) {
+      continue;
+    }
+
+    structuredInsights.push(withWordCount(normalizedTitle, description));
+  }
+
+  return { structuredInsights, recommendations };
+};
+
+const composeInsightText = (structuredInsights: StructuredInsight[], recommendations: string[]): string => {
+  const insightLines = structuredInsights.map((entry) => `${entry.title}: ${entry.description}`);
+  const recommendationLines =
+    recommendations.length > 0 ? recommendations.map((item) => `- ${item}`) : [fallbackRecommendationMessage];
+
+  return [...insightLines, "Actionable Recommendations:", ...recommendationLines].join("\n");
+};
+
+const generateFallbackRecommendations = (summary: unknown): string[] => {
+  const data = (summary ?? {}) as SummaryShape;
+  const kpis = data.kpis ?? {};
+  const topCategory = (data.topCategories ?? [])[0] ?? {};
+  const topRegion = (data.regionalDistribution ?? [])[0] ?? {};
+  const strongestAgeBand = [...(data.ageTrend ?? [])]
+    .sort((a, b) => numberOrZero(b.survivalRatePct) - numberOrZero(a.survivalRatePct))[0] ?? {};
+
+  const recommendations: string[] = [];
+
+  if (topCategory.category) {
+    recommendations.push(
+      `Prioritize class-specific intervention tracking for ${topCategory.category}, since it has the largest passenger volume and outsized impact on overall outcomes.`
+    );
+  }
+
+  if (topRegion.region) {
+    recommendations.push(
+      `Run a focused quality check on embarkation data for ${topRegion.region} to confirm whether regional survival variance reflects signal or sampling bias.`
+    );
+  }
+
+  if (strongestAgeBand.ageBand) {
+    recommendations.push(
+      `Create an age-band monitoring rule for ${strongestAgeBand.ageBand} to replicate factors behind stronger survival performance in adjacent cohorts.`
+    );
+  }
+
+  if (recommendations.length === 0 && Number.isFinite(numberOrZero(kpis.survivalRatePct))) {
+    recommendations.push(
+      `Track weekly survival-rate movement against the current ${numberOrZero(kpis.survivalRatePct).toFixed(2)}% baseline and trigger review when drift exceeds 2 percentage points.`
+    );
+  }
+
+  return recommendations.slice(0, 3);
+};
+
 const trimToWordLimit = (text: string, maxWords: number): string => {
   const words = text.trim().split(/\s+/).filter(Boolean);
   if (words.length <= maxWords) {
@@ -85,7 +287,7 @@ const trimToWordLimit = (text: string, maxWords: number): string => {
   return `${words.slice(0, maxWords).join(" ")}...`;
 };
 
-const buildLocalInsight = (summary: unknown, maxWords: number): string => {
+const buildLocalInsightPayload = (summary: unknown, maxWords: number): NormalizedInsightPayload => {
   const data = (summary ?? {}) as SummaryShape;
   const kpis = data.kpis ?? {};
   const topCategory = (data.topCategories ?? [])[0] ?? {};
@@ -111,14 +313,69 @@ const buildLocalInsight = (summary: unknown, maxWords: number): string => {
   const ageBandName = strongestAgeBand.ageBand || "N/A";
   const ageBandRate = numberOrZero(strongestAgeBand.survivalRatePct).toFixed(2);
 
-  const insight = [
-    `1) Key trend: Survival is ${survivalRate}% (${survivorCount}/${passengerCount}), with the strongest performance in ${topClass}.`,
-    `2) Top driver: ${topCategoryName} has the largest volume (${topCategoryCount} passengers) and ${topCategoryRate}% survival, suggesting class-level segmentation is the primary outcome driver.`,
-    `3) Potential anomaly: ${topRegionName} contributes ${topRegionShare}% of passengers but has ${topRegionRate}% survival; this regional skew should be checked for route or manifest bias. The highest age-band survival is ${ageBandName} at ${ageBandRate}%.`,
-    `4) Two actionable recommendations: A) Prioritize class- and embarkation-based risk/retention dashboards for earlier interventions. B) Add feature checks around fare (${avgFare}) and age (${avgAge}) interactions to validate whether these variables are confounding class effects.`
-  ].join(" ");
+  const structuredInsights: StructuredInsight[] = [
+    withWordCount(
+      "Key Trend",
+      `Overall survival is ${survivalRate}% (${survivorCount}/${passengerCount}), with Class ${topClass} performing best across passenger segments.`
+    ),
+    withWordCount(
+      "Top Driver",
+      `${topCategoryName} holds the largest passenger share (${topCategoryCount}) and a ${topCategoryRate}% survival rate, indicating class-level factors are the strongest outcome driver.`
+    ),
+    withWordCount(
+      "Potential Anomaly",
+      `${topRegionName} contributes ${topRegionShare}% of passengers but shows ${topRegionRate}% survival, and ${ageBandName} peaks at ${ageBandRate}% survival, so both should be validated for sample skew.`
+    )
+  ];
 
-  return trimToWordLimit(insight, maxWords);
+  const fallbackRecommendations = generateFallbackRecommendations(summary);
+  const recommendationAugmentation =
+    fallbackRecommendations.length > 0
+      ? fallbackRecommendations
+      : [
+          `Review interactions between fare (${avgFare}) and age (${avgAge}) against class outcome differences to confirm whether confounding variables are inflating the trend.`
+        ];
+
+  return {
+    insight: trimToWordLimit(composeInsightText(structuredInsights, recommendationAugmentation), maxWords),
+    structuredInsights,
+    recommendations: recommendationAugmentation.slice(0, 3)
+  };
+};
+
+const normalizeAiInsightPayload = (rawInsight: string, summary: unknown, maxWords: number): NormalizedInsightPayload => {
+  const { structuredInsights: extractedInsights, recommendations: extractedRecommendations } = extractStructuredFromText(rawInsight);
+  const localFallback = buildLocalInsightPayload(summary, maxWords);
+
+  // Keep deterministic title order and backfill missing sections so the UI never renders sparse cards.
+  const insightByTitle = new Map<InsightTitle, StructuredInsight>();
+  for (const insight of extractedInsights) {
+    if (insight.description) {
+      insightByTitle.set(insight.title, withWordCount(insight.title, insight.description));
+    }
+  }
+
+  for (const fallbackInsight of localFallback.structuredInsights) {
+    if (!insightByTitle.has(fallbackInsight.title)) {
+      insightByTitle.set(fallbackInsight.title, fallbackInsight);
+    }
+  }
+
+  const structuredInsights = insightTitleOrder.map((title) => insightByTitle.get(title)).filter((entry): entry is StructuredInsight => Boolean(entry));
+
+  const fallbackRecommendations = generateFallbackRecommendations(summary);
+  const recommendations =
+    extractedRecommendations.length > 0
+      ? extractedRecommendations.slice(0, 3)
+      : fallbackRecommendations.length > 0
+        ? fallbackRecommendations
+        : localFallback.recommendations;
+
+  return {
+    insight: trimToWordLimit(composeInsightText(structuredInsights, recommendations), maxWords),
+    structuredInsights,
+    recommendations
+  };
 };
 
 const generateWithGemini = async (prompt: string): Promise<string> => {
@@ -222,24 +479,37 @@ export const buildInsightPrompt = (summary: unknown, maxWords: number): string =
     "You are a business analyst for DataInsights Corp.",
     "Analyze this Titanic passenger analytics summary:",
     JSON.stringify(summary, null, 2),
-    "Return exactly:",
-    "1) Key trend",
-    "2) Top driver",
-    "3) Potential anomaly",
-    "4) Two actionable recommendations",
-    `Keep the answer concise and under ${maxWords} words.`
+    "Return plain text with exactly these sections and no markdown symbols:",
+    "Key Trend:",
+    "Top Driver:",
+    "Potential Anomaly:",
+    "Actionable Recommendations:",
+    "- recommendation 1",
+    "- recommendation 2",
+    "- recommendation 3",
+    "Rules:",
+    "1) Never use **, ##, or standalone bullet markers without text.",
+    "2) Actionable Recommendations must include at least 1 and at most 3 practical recommendations.",
+    "3) Recommendations must be context-aware and based on the provided dataset summary.",
+    `4) Keep the response concise and under ${maxWords} words.`
   ].join("\n");
 };
 
-export const generateAiInsight = async (summary: unknown, maxWords: number): Promise<{ insight: string; fallbackUsed: boolean }> => {
+export const generateAiInsight = async (
+  summary: unknown,
+  maxWords: number
+): Promise<{ insight: string; fallbackUsed: boolean; structuredInsights: StructuredInsight[]; recommendations: string[] }> => {
   const prompt = buildInsightPrompt(summary, maxWords);
   const providerOrder = getProviderOrder();
   const errors: string[] = [];
 
   if (!hasAnyProviderKey()) {
+    const localPayload = buildLocalInsightPayload(summary, maxWords);
     return {
-      insight: buildLocalInsight(summary, maxWords),
-      fallbackUsed: true
+      insight: localPayload.insight,
+      fallbackUsed: true,
+      structuredInsights: localPayload.structuredInsights,
+      recommendations: localPayload.recommendations
     };
   }
 
@@ -247,7 +517,13 @@ export const generateAiInsight = async (summary: unknown, maxWords: number): Pro
     for (const provider of providerOrder) {
       try {
         const insight = await runWithRetry(provider, prompt);
-        return { insight, fallbackUsed: false };
+        const normalizedPayload = normalizeAiInsightPayload(insight, summary, maxWords);
+        return {
+          insight: normalizedPayload.insight,
+          fallbackUsed: false,
+          structuredInsights: normalizedPayload.structuredInsights,
+          recommendations: normalizedPayload.recommendations
+        };
       } catch (error) {
         errors.push(formatProviderError(provider, error));
       }
@@ -256,10 +532,15 @@ export const generateAiInsight = async (summary: unknown, maxWords: number): Pro
     throw new AppError(`All AI providers failed. ${errors.join(" | ")}`, 500, "AI_ERROR");
   } catch (error) {
     console.warn("AI generation failed; returning local insight fallback.");
+    const localPayload = buildLocalInsightPayload(summary, maxWords);
     return {
-      insight: buildLocalInsight(summary, maxWords),
-      fallbackUsed: true
+      insight: localPayload.insight,
+      fallbackUsed: true,
+      structuredInsights: localPayload.structuredInsights,
+      recommendations: localPayload.recommendations
     };
   }
 };
+
+
 
