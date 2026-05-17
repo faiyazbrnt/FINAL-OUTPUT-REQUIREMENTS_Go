@@ -8,6 +8,7 @@ import RegionalPieChart from "../charts/RegionalPieChart";
 import { useDashboardData } from "../hooks/useDashboardData";
 
 const appTitle = import.meta.env.VITE_APP_TITLE || "DataInsights Analytics Dashboard";
+const displayTitle = appTitle.replace(/\s*\(local dev\)\s*$/i, "");
 
 const DashboardPage = (): JSX.Element => {
   const { filters, setFilters, summary, loading, error, insightState, requestInsight, refresh, lastUpdatedLabel } =
@@ -19,7 +20,7 @@ const DashboardPage = (): JSX.Element => {
         <header className="panel p-4 md:p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-xl font-bold text-slate-900 md:text-2xl">{appTitle}</h1>
+              <h1 className="text-xl font-bold text-slate-900 md:text-2xl">{displayTitle}</h1>
               <p className="mt-1 text-sm text-slate-600">Titanic analytics with AI-generated observations</p>
             </div>
             <p className="rounded-md bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">Last updated: {lastUpdatedLabel}</p>
