@@ -11,21 +11,20 @@ const FiltersPanel = ({ filters, setFilters, onRefresh }: FiltersPanelProps): JS
   return (
     <section className="panel p-4 md:p-5" aria-label="Dashboard filters">
       <div className="panel-header">
-        <h2 className="text-base font-semibold">Filters</h2>
-        <button
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-          onClick={onRefresh}
-          type="button"
-        >
+        <div>
+          <h2 className="section-title">Filters</h2>
+          <p className="section-subtitle">Refine dashboard metrics and chart aggregation behavior.</p>
+        </div>
+        <button className="ui-button ui-button-secondary w-full sm:w-auto" onClick={onRefresh} type="button">
           Refresh Data
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+        <label className="ui-label">
           Top Categories Limit
           <select
-            className="rounded-md border border-slate-300 bg-white px-3 py-2"
+            className="ui-select"
             value={filters.categoryLimit}
             onChange={(event) => {
               const limit = Number(event.target.value);
@@ -38,10 +37,10 @@ const FiltersPanel = ({ filters, setFilters, onRefresh }: FiltersPanelProps): JS
           </select>
         </label>
 
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+        <label className="ui-label">
           Age Trend Bucket Size
           <select
-            className="rounded-md border border-slate-300 bg-white px-3 py-2"
+            className="ui-select"
             value={filters.ageBucketSize}
             onChange={(event) => {
               const bucketSize = Number(event.target.value);
@@ -55,10 +54,10 @@ const FiltersPanel = ({ filters, setFilters, onRefresh }: FiltersPanelProps): JS
           </select>
         </label>
 
-        <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+        <label className="ui-label">
           AI Insight Max Words
           <input
-            className="rounded-md border border-slate-300 bg-white px-3 py-2"
+            className="ui-input"
             type="number"
             min={60}
             max={220}
