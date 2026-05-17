@@ -85,6 +85,48 @@ const trimToWordLimit = (text: string, maxWords: number): string => {
   return `${words.slice(0, maxWords).join(" ")}...`;
 };
 
+const normalizeSpacing = (text: string): string => text.replace(/\s+/g, " ").trim();
+
+const enforceFirstFourInsights = (insight: string, maxWords: number): string => {
+  const normalized = insight.trim();
+  if (!normalized) {
+    return normalized;
+  }
+
+  const numberedSections = normalized
+    .split(/(?=\d+[\)\.]\s+)/)
+    .map((section) => section.trim())
+    .filter((section) => /^\d+[\)\.]\s+/.test(section));
+
+  if (numberedSections.length === 0) {
+    return trimToWordLimit(normalizeSpacing(normalized), maxWords);
+  }
+
+  const seenNumbers = new Set<number>();
+  const firstFour = numberedSections
+    .map((section) => {
+      const match = section.match(/^(\d+)[\)\.]\s+/);
+      if (!match) {
+        return null;
+      }
+
+      const sectionNumber = Number(match[1]);
+      if (!Number.isFinite(sectionNumber) || sectionNumber < 1 || sectionNumber > 4 || seenNumbers.has(sectionNumber)) {
+        return null;
+      }
+
+      seenNumbers.add(sectionNumber);
+      return `${sectionNumber}) ${section.slice(match[0].length).trim()}`;
+    })
+    .filter((section): section is string => Boolean(section));
+
+  if (firstFour.length === 0) {
+    return trimToWordLimit(normalizeSpacing(normalized), maxWords);
+  }
+
+  return trimToWordLimit(firstFour.join(" "), maxWords);
+};
+
 const buildLocalInsight = (summary: unknown, maxWords: number): string => {
   const data = (summary ?? {}) as SummaryShape;
   const kpis = data.kpis ?? {};
@@ -112,10 +154,10 @@ const buildLocalInsight = (summary: unknown, maxWords: number): string => {
   const ageBandRate = numberOrZero(strongestAgeBand.survivalRatePct).toFixed(2);
 
   const insight = [
-    `1) Key trend: Survival is ${survivalRate}% (${survivorCount}/${passengerCount}), with the strongest performance in ${topClass}.`,
-    `2) Top driver: ${topCategoryName} has the largest volume (${topCategoryCount} passengers) and ${topCategoryRate}% survival, suggesting class-level segmentation is the primary outcome driver.`,
-    `3) Potential anomaly: ${topRegionName} contributes ${topRegionShare}% of passengers but has ${topRegionRate}% survival; this regional skew should be checked for route or manifest bias. The highest age-band survival is ${ageBandName} at ${ageBandRate}%.`,
-    `4) Two actionable recommendations: A) Prioritize class- and embarkation-based risk/retention dashboards for earlier interventions. B) Add feature checks around fare (${avgFare}) and age (${avgAge}) interactions to validate whether these variables are confounding class effects.`
+    `1) Key trend: The survival rate is ${survivalRate}% (${survivorCount}/${passengerCount}), with the strongest results in ${topClass}.`,
+    `2) Top driver: ${topCategoryName} has the largest volume (${topCategoryCount} passengers) and a survival rate of ${topCategoryRate}%, indicating that class-level segmentation is the primary driver of outcomes.`,
+    `3) Potential anomaly: ${topRegionName} accounts for ${topRegionShare}% of passengers but has a survival rate of ${topRegionRate}%. This regional skew should be reviewed for possible route or manifest bias. The highest age-band survival is in ${ageBandName} at ${ageBandRate}%.`,
+    `4) Two actionable recommendations: A) Prioritize class- and embarkation-based risk and retention dashboards for earlier interventions. B) Add feature checks for interactions between fare (${avgFare}) and age (${avgAge}) to confirm whether these variables confound class effects.`
   ].join(" ");
 
   return trimToWordLimit(insight, maxWords);
@@ -222,11 +264,12 @@ export const buildInsightPrompt = (summary: unknown, maxWords: number): string =
     "You are a business analyst for DataInsights Corp.",
     "Analyze this Titanic passenger analytics summary:",
     JSON.stringify(summary, null, 2),
-    "Return exactly:",
+    "Return exactly four numbered sections and do not include sections 5 or higher:",
     "1) Key trend",
     "2) Top driver",
     "3) Potential anomaly",
     "4) Two actionable recommendations",
+    "Use clear, grammatically correct, professional English.",
     `Keep the answer concise and under ${maxWords} words.`
   ].join("\n");
 };
@@ -246,7 +289,8 @@ export const generateAiInsight = async (summary: unknown, maxWords: number): Pro
   try {
     for (const provider of providerOrder) {
       try {
-        const insight = await runWithRetry(provider, prompt);
+        const rawInsight = await runWithRetry(provider, prompt);
+        const insight = enforceFirstFourInsights(rawInsight, maxWords);
         return { insight, fallbackUsed: false };
       } catch (error) {
         errors.push(formatProviderError(provider, error));

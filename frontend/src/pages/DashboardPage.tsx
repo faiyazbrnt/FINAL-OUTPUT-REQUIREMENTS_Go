@@ -15,28 +15,33 @@ const DashboardPage = (): JSX.Element => {
 
   return (
     <main className="dashboard-shell">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
-        <header className="panel p-4 md:p-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-xl font-bold text-slate-900 md:text-2xl">{appTitle}</h1>
-              <p className="mt-1 text-sm text-slate-600">Titanic analytics with AI-generated observations</p>
+      <div className="dashboard-content mx-auto flex w-full max-w-[86rem] flex-col gap-5">
+        <header className="panel page-header p-5 md:p-7">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="flex max-w-3xl flex-col gap-2">
+              <span className="hero-kicker">Operations Dashboard</span>
+              <h1 className="text-2xl font-bold text-slate-900 md:text-3xl">{appTitle}</h1>
+              <p className="section-subtitle">Titanic analytics with AI-generated observations</p>
             </div>
-            <p className="rounded-md bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">Last updated: {lastUpdatedLabel}</p>
+            <p className="ui-status-tag">Last updated: {lastUpdatedLabel}</p>
           </div>
         </header>
 
         <FiltersPanel filters={filters} setFilters={setFilters} onRefresh={refresh} />
 
         {loading && (
-          <section className="panel p-4 text-sm text-slate-600">
-            <p>Loading dashboard data...</p>
+          <section className="panel p-4 md:p-5">
+            <div className="status-panel">
+              <p>Loading dashboard data...</p>
+            </div>
           </section>
         )}
 
         {error && (
-          <section className="panel p-4 text-sm text-red-700">
-            <p>{error}</p>
+          <section className="panel p-4 md:p-5">
+            <div className="status-panel status-panel-error">
+              <p>{error}</p>
+            </div>
           </section>
         )}
 
@@ -62,6 +67,10 @@ const DashboardPage = (): JSX.Element => {
             </div>
           </div>
         )}
+
+        <footer className="app-footer px-1 pb-2 pt-1 text-center">
+          Data refreshed from backend analytics and AI services with existing validations and workflows.
+        </footer>
       </div>
     </main>
   );
