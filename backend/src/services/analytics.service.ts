@@ -1,4 +1,7 @@
 import { type SupabaseClient } from "@supabase/supabase-js";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { env } from "../config/env";
 import { isSupabaseConfigured, supabase, supabaseDiagnostics } from "../config/supabase";
 import { AppError } from "../utils/httpError";
 
@@ -11,6 +14,13 @@ type TitanicPassenger = {
   embarked: "C" | "Q" | "S" | null;
 };
 
+const LOCAL_DATASET_PATH_CANDIDATES = [
+  "../dataset/cleaned/titanic_train_cleaned_db.csv",
+  "dataset/cleaned/titanic_train_cleaned_db.csv"
+];
+
+let localPassengersPromise: Promise<TitanicPassenger[]> | null = null;
+
 const round = (value: number, decimals = 2): number => {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
@@ -22,6 +32,133 @@ const percent = (part: number, whole: number): number => {
   }
 
   return round((part / whole) * 100, 2);
+};
+
+const parseCsvLine = (line: string): string[] => {
+  const values: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const next = line[i + 1];
+
+    if (char === "\"") {
+      if (inQuotes && next === "\"") {
+        current += "\"";
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === "," && !inQuotes) {
+      values.push(current);
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  values.push(current);
+  return values;
+};
+
+const parseOptionalNumber = (value: string | undefined): number | null => {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const loadLocalPassengersFromCsv = async (): Promise<TitanicPassenger[]> => {
+  let fileContents: string | null = null;
+  let resolvedPath = "";
+
+  for (const candidate of LOCAL_DATASET_PATH_CANDIDATES) {
+    const absolutePath = resolve(process.cwd(), candidate);
+    try {
+      fileContents = await readFile(absolutePath, "utf-8");
+      resolvedPath = absolutePath;
+      break;
+    } catch {
+      // Try next candidate path.
+    }
+  }
+
+  if (!fileContents) {
+    throw new AppError(
+      "Local analytics dataset was not found.",
+      500,
+      "LOCAL_DATASET_NOT_FOUND",
+      "Expected dataset/cleaned/titanic_train_cleaned_db.csv."
+    );
+  }
+
+  const lines = fileContents
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  if (lines.length <= 1) {
+    return [];
+  }
+
+  const headers = parseCsvLine(lines[0]).map((header) => header.trim().toLowerCase());
+  const survivedIndex = headers.indexOf("survived");
+  const pclassIndex = headers.indexOf("pclass");
+  const sexIndex = headers.indexOf("sex");
+  const ageIndex = headers.indexOf("age");
+  const fareIndex = headers.indexOf("fare");
+  const embarkedIndex = headers.indexOf("embarked");
+
+  if ([survivedIndex, pclassIndex, sexIndex, ageIndex, fareIndex, embarkedIndex].some((index) => index === -1)) {
+    throw new AppError(
+      "Local analytics dataset schema is invalid.",
+      500,
+      "LOCAL_DATASET_INVALID_SCHEMA",
+      `Required columns are missing in ${resolvedPath}.`
+    );
+  }
+
+  const rows: TitanicPassenger[] = [];
+
+  for (let i = 1; i < lines.length; i += 1) {
+    const values = parseCsvLine(lines[i]);
+    const survivedRaw = parseOptionalNumber(values[survivedIndex]);
+    const pclassRaw = parseOptionalNumber(values[pclassIndex]);
+    const fareRaw = parseOptionalNumber(values[fareIndex]);
+    const ageRaw = parseOptionalNumber(values[ageIndex]);
+    const sexRaw = (values[sexIndex] || "").trim().toLowerCase();
+    const embarkedRaw = (values[embarkedIndex] || "").trim().toUpperCase();
+
+    if (survivedRaw === null || pclassRaw === null || fareRaw === null || (sexRaw !== "male" && sexRaw !== "female")) {
+      continue;
+    }
+
+    rows.push({
+      survived: survivedRaw === 1 ? 1 : 0,
+      pclass: pclassRaw,
+      sex: sexRaw,
+      age: ageRaw,
+      fare: fareRaw,
+      embarked: embarkedRaw === "C" || embarkedRaw === "Q" || embarkedRaw === "S" ? embarkedRaw : null
+    });
+  }
+
+  return rows;
+};
+
+const getLocalPassengers = async (): Promise<TitanicPassenger[]> => {
+  if (!localPassengersPromise) {
+    localPassengersPromise = loadLocalPassengersFromCsv();
+  }
+
+  return localPassengersPromise;
 };
 
 const getSupabaseClient = (): SupabaseClient => {
@@ -135,6 +272,13 @@ const classifyFetchFailure = (error: unknown): { errorCode: string; logReason: s
 };
 
 const fetchPassengers = async (): Promise<TitanicPassenger[]> => {
+  if (!isSupabaseConfigured || !supabase) {
+    if (env.NODE_ENV !== "production") {
+      console.warn("[analytics] Supabase is not configured. Falling back to local CSV dataset.");
+      return getLocalPassengers();
+    }
+  }
+
   const client = getSupabaseClient();
 
   try {
