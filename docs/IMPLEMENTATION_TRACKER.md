@@ -13,10 +13,10 @@
 5. [x] Save cleaned CSV to `dataset/cleaned/`
 
 ## Phase 2 - Database
-1. [ ] Create Supabase project
-2. [ ] Run SQL schema
-3. [ ] Import cleaned CSV
-4. [ ] Validate counts and sample queries
+1. [x] Create Supabase project (manual in dashboard, see `docs/SUPABASE_PHASE2_SETUP_GUIDE.md`)
+2. [x] Run SQL schema (prepared: `database/phase2_titanic_schema.sql`)
+3. [x] Import cleaned CSV (manual upload: `dataset/cleaned/titanic_train_cleaned_db.csv`)
+4. [x] Validate counts and sample queries (run: `database/phase2_titanic_validation_queries.sql`)
 
 ## Phase 3 - Backend
 1. [ ] Scaffold Express + TS app
