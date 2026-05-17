@@ -38,3 +38,6 @@
 - Source screenshot: Pending (to be captured in docs/evidence/)
 - Upload screenshot: N/A for local Phase 1 data step
 - Supabase import screenshot: Pending (Phase 2)
+
+## Phase 2 Database Import Asset
+- Supabase-ready CSV (snake_case headers): `dataset/cleaned/titanic_train_cleaned_db.csv`

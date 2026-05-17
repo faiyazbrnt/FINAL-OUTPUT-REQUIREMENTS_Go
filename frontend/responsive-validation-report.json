@@ -1,0 +1,33 @@
+{
+  "passed": true,
+  "checkedAt": "2026-05-17T07:52:15.591Z",
+  "viewports": [
+    {
+      "viewport": "mobile",
+      "width": 375,
+      "height": 812,
+      "expectedKpiColumns": 1,
+      "actualKpiColumns": 1,
+      "horizontalOverflow": false,
+      "aiInsightRendered": true
+    },
+    {
+      "viewport": "tablet",
+      "width": 768,
+      "height": 1024,
+      "expectedKpiColumns": 2,
+      "actualKpiColumns": 2,
+      "horizontalOverflow": false,
+      "aiInsightRendered": true
+    },
+    {
+      "viewport": "desktop",
+      "width": 1280,
+      "height": 900,
+      "expectedKpiColumns": 3,
+      "actualKpiColumns": 3,
+      "horizontalOverflow": false,
+      "aiInsightRendered": true
+    }
+  ]
+}

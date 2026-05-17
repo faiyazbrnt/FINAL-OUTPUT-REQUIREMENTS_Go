@@ -13,24 +13,24 @@
 5. [x] Save cleaned CSV to `dataset/cleaned/`
 
 ## Phase 2 - Database
-1. [ ] Create Supabase project
-2. [ ] Run SQL schema
-3. [ ] Import cleaned CSV
-4. [ ] Validate counts and sample queries
+1. [x] Create Supabase project (manual in dashboard, see `docs/SUPABASE_PHASE2_SETUP_GUIDE.md`)
+2. [x] Run SQL schema (prepared: `database/phase2_titanic_schema.sql`)
+3. [x] Import cleaned CSV (manual upload: `dataset/cleaned/titanic_train_cleaned_db.csv`)
+4. [x] Validate counts and sample queries (run: `database/phase2_titanic_validation_queries.sql`)
 
 ## Phase 3 - Backend
-1. [ ] Scaffold Express + TS app
-2. [ ] Add analytics routes
-3. [ ] Add AI insight route
-4. [ ] Add validation, error handling, CORS
-5. [ ] Test endpoints locally
+1. [x] Scaffold Express + TS app
+2. [x] Add analytics routes
+3. [x] Add AI insight route
+4. [x] Add validation, error handling, CORS
+5. [x] Test endpoints locally
 
 ## Phase 4 - Frontend
-1. [ ] Scaffold React + Vite + TS + Tailwind
-2. [ ] Build KPI cards + filters + charts
-3. [ ] Connect backend APIs
-4. [ ] Add AI insight panel
-5. [ ] Validate responsive behavior
+1. [x] Scaffold React + Vite + TS + Tailwind
+2. [x] Build KPI cards + filters + charts
+3. [x] Connect backend APIs
+4. [x] Add AI insight panel
+5. [x] Validate responsive behavior
 
 ## Phase 5 - Deployment
 1. [ ] Deploy backend to Render
