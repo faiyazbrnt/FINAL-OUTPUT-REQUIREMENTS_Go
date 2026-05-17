@@ -2,6 +2,14 @@ import axios, { type AxiosError } from "axios";
 import { env } from "../config/env";
 import { AppError } from "../utils/httpError";
 
+const isMissingOrPlaceholder = (value: string, placeholders: string[]): boolean => {
+  if (!value) {
+    return true;
+  }
+
+  return placeholders.includes(value);
+};
+
 const delay = async (ms: number): Promise<void> => {
   await new Promise((resolve) => setTimeout(resolve, ms));
 };
@@ -22,7 +30,7 @@ const extractGeminiText = (payload: unknown): string | null => {
 };
 
 const generateWithGemini = async (prompt: string): Promise<string> => {
-  if (!env.GEMINI_API_KEY || env.GEMINI_API_KEY === "your_gemini_api_key") {
+  if (isMissingOrPlaceholder(env.GEMINI_API_KEY, ["your_gemini_api_key", "YOUR_GEMINI_API_KEY"])) {
     throw new AppError("Gemini API key is missing. Set GEMINI_API_KEY in backend/.env", 500, "AI_NOT_CONFIGURED");
   }
 
@@ -50,7 +58,7 @@ const generateWithGemini = async (prompt: string): Promise<string> => {
 };
 
 const generateWithGroq = async (prompt: string): Promise<string> => {
-  if (!env.GROQ_API_KEY || env.GROQ_API_KEY === "your_groq_api_key") {
+  if (isMissingOrPlaceholder(env.GROQ_API_KEY, ["your_groq_api_key", "YOUR_GROQ_API_KEY"])) {
     throw new AppError("Groq API key is missing. Set GROQ_API_KEY in backend/.env", 500, "AI_NOT_CONFIGURED");
   }
 

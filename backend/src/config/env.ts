@@ -12,7 +12,7 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().default(""),
   AI_PROVIDER: z.enum(["gemini", "groq"]).default("gemini"),
   GEMINI_API_KEY: z.string().default(""),
-  GEMINI_MODEL: z.string().default("gemini-1.5-flash"),
+  GEMINI_MODEL: z.string().default("gemini-2.0-flash"),
   GROQ_API_KEY: z.string().default(""),
   GROQ_MODEL: z.string().default("llama3-8b-8192")
 });
@@ -25,4 +25,5 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
 
