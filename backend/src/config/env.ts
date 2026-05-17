@@ -3,18 +3,34 @@ import { z } from "zod";
 
 config();
 
+const trimString = (value: unknown): unknown => {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  return value.trim();
+};
+
+const compactToken = (value: unknown): unknown => {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  return value.replace(/\s+/g, "").trim();
+};
+
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(5000),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  FRONTEND_URL: z.string().default("http://localhost:5173"),
-  SUPABASE_URL: z.string().default(""),
-  SUPABASE_ANON_KEY: z.string().default(""),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().default(""),
+  FRONTEND_URL: z.preprocess(trimString, z.string()).default("http://localhost:5173"),
+  SUPABASE_URL: z.preprocess(trimString, z.string()).default(""),
+  SUPABASE_ANON_KEY: z.preprocess(compactToken, z.string()).default(""),
+  SUPABASE_SERVICE_ROLE_KEY: z.preprocess(compactToken, z.string()).default(""),
   AI_PROVIDER: z.enum(["gemini", "groq"]).default("gemini"),
-  GEMINI_API_KEY: z.string().default(""),
-  GEMINI_MODEL: z.string().default("gemini-2.0-flash"),
-  GROQ_API_KEY: z.string().default(""),
-  GROQ_MODEL: z.string().default("llama3-8b-8192")
+  GEMINI_API_KEY: z.preprocess(compactToken, z.string()).default(""),
+  GEMINI_MODEL: z.preprocess(trimString, z.string()).default("gemini-2.0-flash"),
+  GROQ_API_KEY: z.preprocess(compactToken, z.string()).default(""),
+  GROQ_MODEL: z.preprocess(trimString, z.string()).default("llama3-8b-8192")
 });
 
 const parsed = envSchema.safeParse(process.env);

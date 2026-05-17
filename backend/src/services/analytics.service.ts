@@ -36,19 +36,48 @@ const getSupabaseClient = (): SupabaseClient => {
   return supabase;
 };
 
+const getErrorDetails = (error: unknown): string => {
+  if (!error) {
+    return "Unknown error";
+  }
+
+  if (error instanceof Error) {
+    const cause = (error as Error & { cause?: unknown }).cause;
+    if (cause && typeof cause === "object") {
+      const code = (cause as { code?: string }).code;
+      const message = (cause as { message?: string }).message;
+      if (code || message) {
+        return `${error.message}${code ? ` | cause.code=${code}` : ""}${message ? ` | cause.message=${message}` : ""}`;
+      }
+    }
+
+    return error.message;
+  }
+
+  return String(error);
+};
+
 const fetchPassengers = async (): Promise<TitanicPassenger[]> => {
   const client = getSupabaseClient();
 
-  const { data, error } = await client
-    .from("titanic_passengers")
-    .select("survived,pclass,sex,age,fare,embarked")
-    .order("passenger_id", { ascending: true });
+  try {
+    const { data, error } = await client
+      .from("titanic_passengers")
+      .select("survived,pclass,sex,age,fare,embarked")
+      .order("passenger_id", { ascending: true });
 
-  if (error) {
-    throw new AppError("Failed to fetch analytics data from Supabase.", 500, "SUPABASE_QUERY_ERROR", error.message);
+    if (error) {
+      throw new AppError("Failed to fetch analytics data from Supabase.", 500, "SUPABASE_QUERY_ERROR", error.message);
+    }
+
+    return (data || []) as TitanicPassenger[];
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError("Failed to fetch analytics data from Supabase.", 500, "SUPABASE_QUERY_ERROR", getErrorDetails(error));
   }
-
-  return (data || []) as TitanicPassenger[];
 };
 
 export const getKpiMetrics = async (): Promise<{
