@@ -16,6 +16,9 @@
     "analytics"
   ],
   "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
     "axios": "^1.13.2",
