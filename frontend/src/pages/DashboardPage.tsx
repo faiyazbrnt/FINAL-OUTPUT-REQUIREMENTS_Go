@@ -6,6 +6,7 @@ import AgeTrendLineChart from "../charts/AgeTrendLineChart";
 import CategoryBarChart from "../charts/CategoryBarChart";
 import RegionalPieChart from "../charts/RegionalPieChart";
 import { useDashboardData } from "../hooks/useDashboardData";
+import MultiTimezoneClock from "../components/MultiTimezoneClock";
 
 const appTitle = import.meta.env.VITE_APP_TITLE || "DataInsights Analytics Dashboard";
 const displayTitle = appTitle.replace(/\s*\(local dev\)\s*$/i, "");
@@ -24,7 +25,10 @@ const DashboardPage = (): JSX.Element => {
               <h1 className="text-2xl font-bold text-slate-900 md:text-3xl">{displayTitle}</h1>
               <p className="section-subtitle">Titanic analytics with AI-generated observations</p>
             </div>
-            <p className="ui-status-tag">Last updated: {lastUpdatedLabel}</p>
+            <div className="header-meta-wrap">
+              <MultiTimezoneClock />
+              <p className="ui-status-tag">Last updated: {lastUpdatedLabel}</p>
+            </div>
           </div>
         </header>
 
