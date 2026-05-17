@@ -1,4 +1,5 @@
 import type { Kpis } from "../types";
+import { convertUsdToPhp, formatPhpCurrency } from "../utils/currency";
 
 type KpiCardsProps = {
   kpis: Kpis;
@@ -6,14 +7,6 @@ type KpiCardsProps = {
 
 const formatNumber = (value: number): string => {
   return value.toLocaleString();
-};
-
-const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2
-  }).format(value);
 };
 
 const KpiCards = ({ kpis }: KpiCardsProps): JSX.Element => {
@@ -35,7 +28,7 @@ const KpiCards = ({ kpis }: KpiCardsProps): JSX.Element => {
     },
     {
       title: "Average Fare",
-      value: formatCurrency(kpis.averageFare),
+      value: formatPhpCurrency(convertUsdToPhp(kpis.averageFare)),
       helper: "Mean fare across passengers"
     }
   ];
