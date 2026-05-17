@@ -32,11 +32,11 @@
 4. [x] Add AI insight panel
 5. [x] Validate responsive behavior
 
-## Phase 5 - Deployment
-1. [ ] Deploy backend to Render
-2. [ ] Deploy frontend to Vercel
-3. [ ] Configure production env vars
-4. [ ] Run production smoke tests
+## Phase 5 - Deployment [x]
+1. [x] Deploy backend to Render
+2. [x] Deploy frontend to Vercel
+3. [x] Configure production env vars
+4. [x] Run production smoke tests
 
 ## Phase 6 - Final Submission
 1. [ ] Finalize README and report
