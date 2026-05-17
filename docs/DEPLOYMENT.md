@@ -24,10 +24,10 @@ Notes:
 
 ## 2) Frontend on Vercel
 
-This repo includes `vercel.json` for monorepo-safe Vite builds.
+This repo includes `frontend/vercel.json` for Vite builds.
 
 1. Import this repository into Vercel as a project.
-2. Keep default root (repo root) so `vercel.json` is used.
+2. Set **Root Directory** to `frontend` so Vercel uses `frontend/vercel.json`.
 3. Set `VITE_API_BASE_URL` in Vercel:
    - Recommended: `https://<your-render-service>.onrender.com/api`
 4. Deploy.
@@ -49,4 +49,3 @@ npm install
 npm run typecheck
 npm run build
 ```
-
