@@ -70,6 +70,39 @@ export const validateRecommendations = (rawRecommendations: unknown): string[] =
 
 const countWords = (value: string): number => value.split(/\s+/).filter(Boolean).length;
 
+const normalizeReportText = (value: unknown): string => {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return toSingleSpace(sanitizeInsightMarkdown(value));
+};
+
+const normalizeReportList = (value: unknown, maxItems: number): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const unique = new Map<string, string>();
+  for (const item of value) {
+    if (typeof item !== "string") {
+      continue;
+    }
+
+    const cleaned = normalizeReportText(item);
+    if (cleaned.length < MIN_RECOMMENDATION_LENGTH) {
+      continue;
+    }
+
+    const key = cleaned.toLowerCase();
+    if (!unique.has(key)) {
+      unique.set(key, cleaned);
+    }
+  }
+
+  return [...unique.values()].slice(0, maxItems);
+};
+
 const parseNarrativeSections = (rawInsight: string): Array<{ title: string; description: string }> => {
   const normalized = sanitizeInsightMarkdown(rawInsight)
     .replace(/\b1[\)\.\-]?\s*key\s*trend\s*[:\-]?/gi, "\nKey Trend: ")
@@ -157,10 +190,47 @@ export const getRecommendations = (data: InsightResponse | null): string[] => {
     return [];
   }
 
+  const reportRecommendations = validateRecommendations(data.report?.recommendations ?? []);
+  if (reportRecommendations.length > 0) {
+    return reportRecommendations;
+  }
+
   const validated = validateRecommendations(data.recommendations ?? []);
   if (validated.length > 0) {
     return validated;
   }
 
   return parseNarrativeRecommendations(data.insight);
+};
+
+export const getStructuredReport = (
+  data: InsightResponse | null
+): {
+  executiveSummary: string;
+  keyFindings: string[];
+  riskAreas: string[];
+  recommendations: string[];
+  confidenceNotes: string;
+} | null => {
+  if (!data?.report) {
+    return null;
+  }
+
+  const executiveSummary = normalizeReportText(data.report.executiveSummary);
+  const keyFindings = normalizeReportList(data.report.keyFindings, 5);
+  const riskAreas = normalizeReportList(data.report.riskAreas, 4);
+  const recommendations = normalizeReportList(data.report.recommendations, 3);
+  const confidenceNotes = normalizeReportText(data.report.confidenceNotes);
+
+  if (!executiveSummary && keyFindings.length === 0 && recommendations.length === 0 && !confidenceNotes) {
+    return null;
+  }
+
+  return {
+    executiveSummary,
+    keyFindings,
+    riskAreas,
+    recommendations,
+    confidenceNotes
+  };
 };

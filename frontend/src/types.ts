@@ -36,6 +36,13 @@ export type InsightResponse = {
     wordCount: number;
   }>;
   recommendations?: string[];
+  report?: {
+    executiveSummary?: string;
+    keyFindings?: string[];
+    riskAreas?: string[];
+    recommendations?: string[];
+    confidenceNotes?: string;
+  };
 };
 
 export type DashboardSummary = {
@@ -48,5 +55,18 @@ export type DashboardSummary = {
 export type DashboardFilters = {
   categoryLimit: number;
   ageBucketSize: number;
-  maxInsightWords: number;
+};
+
+export type ImportedPassengerRow = {
+  survived: 0 | 1;
+  pclass: number;
+  sex: "male" | "female";
+  age: number | null;
+  fare: number;
+  embarked: "C" | "Q" | "S" | null;
+};
+
+export type ImportExportNotice = {
+  tone: "success" | "error" | "info";
+  message: string;
 };
