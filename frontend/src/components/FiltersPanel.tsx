@@ -1,15 +1,45 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { DashboardFilters } from "../types";
+import type { DashboardFilters, ImportExportNotice } from "../types";
+import ImportExportButton from "./ImportExportButton";
 
 type FiltersPanelProps = {
   filters: DashboardFilters;
   setFilters: Dispatch<SetStateAction<DashboardFilters>>;
   onRefresh: () => void;
+  onImportData: (file: File) => Promise<void>;
+  onExportPdf: () => Promise<void>;
+  onExportCsv: () => Promise<void>;
+  onExportExcel: () => Promise<void>;
+  onDownloadCsvTemplate: () => Promise<void>;
+  onDownloadExcelTemplate: () => Promise<void>;
+  importExportDisabled: boolean;
+  importExportStatus: ImportExportNotice | null;
+  dataSourceLabel: string;
 };
 
-const FiltersPanel = ({ filters, setFilters, onRefresh }: FiltersPanelProps): JSX.Element => {
+const FiltersPanel = ({
+  filters,
+  setFilters,
+  onRefresh,
+  onImportData,
+  onExportPdf,
+  onExportCsv,
+  onExportExcel,
+  onDownloadCsvTemplate,
+  onDownloadExcelTemplate,
+  importExportDisabled,
+  importExportStatus,
+  dataSourceLabel
+}: FiltersPanelProps): JSX.Element => {
+  const statusToneClass =
+    importExportStatus?.tone === "error"
+      ? "import-export-status-error"
+      : importExportStatus?.tone === "success"
+        ? "import-export-status-success"
+        : "import-export-status-info";
+
   return (
-    <section className="panel p-4 md:p-5" aria-label="Dashboard filters">
+    <section className="panel panel-filters p-4 md:p-5" aria-label="Dashboard filters">
       <div className="panel-header">
         <div>
           <h2 className="section-title">Filters</h2>
@@ -54,21 +84,23 @@ const FiltersPanel = ({ filters, setFilters, onRefresh }: FiltersPanelProps): JS
           </select>
         </label>
 
-        <label className="ui-label">
-          AI Insight Max Words
-          <input
-            className="ui-input"
-            type="number"
-            min={60}
-            max={220}
-            step={10}
-            value={filters.maxInsightWords}
-            onChange={(event) => {
-              const maxInsightWords = Number(event.target.value);
-              setFilters((current) => ({ ...current, maxInsightWords }));
-            }}
+        <div className="ui-label">
+          Data Actions
+          <ImportExportButton
+            disabled={importExportDisabled}
+            onImportData={onImportData}
+            onExportPdf={onExportPdf}
+            onExportCsv={onExportCsv}
+            onExportExcel={onExportExcel}
+            onDownloadCsvTemplate={onDownloadCsvTemplate}
+            onDownloadExcelTemplate={onDownloadExcelTemplate}
           />
-        </label>
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        <p className="import-export-source">Current dataset: {dataSourceLabel}</p>
+        {importExportStatus && <p className={`import-export-status ${statusToneClass}`}>{importExportStatus.message}</p>}
       </div>
     </section>
   );
