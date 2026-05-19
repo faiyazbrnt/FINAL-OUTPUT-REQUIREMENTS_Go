@@ -39,6 +39,6 @@
 4. [x] Run production smoke tests
 
 ## Phase 6 - Final Submission
-1. [ ] Finalize README and report
-2. [ ] Collect screenshots
-3. [ ] Verify submission checklist
+1. [x] Finalize README and report
+2. [x] Collect screenshots
+3. [x] Verify submission checklist
