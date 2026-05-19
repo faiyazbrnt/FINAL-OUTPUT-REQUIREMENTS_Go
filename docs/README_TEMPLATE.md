@@ -1,14 +1,14 @@
 # AI-Powered Big Data Cloud Analytics Dashboard
 
 ## Course Details
-- Course: `__________`
-- Term: `__________`
-- Section: `__________`
+- Course: `ICS-IT`
+- Term: `3rd Year 2nd Sem`
+- Section: `CEIT-37-601A`
 
 ## Group Members
-1. `Name - Role`
-2. `Name - Role`
-3. `Name - Role`
+1. `Brent Liam Emmanuel, L. Go - Main Developer`
+2. `Edison Lloyd B. Balatbat - Full Stack Developer`
+3. `John Patrick Cabilan - Full Stack Developer`
 
 ## Project Overview
 Short description of the analytics problem, target users, and expected value for DataInsights Corp.
@@ -72,14 +72,14 @@ Attach architecture diagram and explain frontend, backend, database, and AI data
 - Repository:
 
 ## Challenges Encountered
-1.
-2.
-3.
+1. Setting up a stable data flow between Supabase and local development was challenging because missing or placeholder environment variables caused API failures, so we implemented clearer env validation and a CSV fallback strategy.
+2. Integrating AI insights was difficult due to inconsistent provider responses and occasional timeouts/rate limits, so we added provider failover (Gemini to Groq), retries, and a local deterministic fallback to keep the feature reliable.
+3. Maintaining consistent analytics output across backend API data and frontend imported CSV/XLSX files was challenging, so we built strict file validation, normalization rules, and shared metric computation logic.
 
 ## Key Learnings
-1.
-2.
-3.
+1. We learned that strong input validation (query params, request body, and imported files) is critical in full-stack apps to prevent silent errors and improve user trust.
+2. We learned to design resilient systems by planning fallback behavior early, especially for cloud services like Supabase and external AI APIs that can fail or be misconfigured.
+3. We improved our teamwork in a monorepo setup by separating backend/frontend responsibilities, documenting scripts and deployment steps, and testing changes end-to-end before release.
 
 ## Local Setup
 ```bash

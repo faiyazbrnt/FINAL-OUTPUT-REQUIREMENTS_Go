@@ -12,8 +12,26 @@ const appTitle = import.meta.env.VITE_APP_TITLE || "DataInsights Analytics Dashb
 const displayTitle = appTitle.replace(/\s*\(local dev\)\s*$/i, "");
 
 const DashboardPage = (): JSX.Element => {
-  const { filters, setFilters, summary, loading, error, insightState, requestInsight, refresh, lastUpdatedLabel } =
-    useDashboardData();
+  const {
+    filters,
+    setFilters,
+    summary,
+    loading,
+    error,
+    insightState,
+    requestInsight,
+    refresh,
+    lastUpdatedLabel,
+    onImportData,
+    onExportPdf,
+    onExportCsv,
+    onExportExcel,
+    onDownloadCsvTemplate,
+    onDownloadExcelTemplate,
+    importExportBusy,
+    importExportStatus,
+    dataSourceLabel
+  } = useDashboardData();
 
   return (
     <main className="dashboard-shell">
@@ -32,7 +50,20 @@ const DashboardPage = (): JSX.Element => {
           </div>
         </header>
 
-        <FiltersPanel filters={filters} setFilters={setFilters} onRefresh={refresh} />
+        <FiltersPanel
+          filters={filters}
+          setFilters={setFilters}
+          onRefresh={refresh}
+          onImportData={onImportData}
+          onExportPdf={onExportPdf}
+          onExportCsv={onExportCsv}
+          onExportExcel={onExportExcel}
+          onDownloadCsvTemplate={onDownloadCsvTemplate}
+          onDownloadExcelTemplate={onDownloadExcelTemplate}
+          importExportDisabled={importExportBusy}
+          importExportStatus={importExportStatus}
+          dataSourceLabel={dataSourceLabel}
+        />
 
         {loading && (
           <section className="panel p-4 md:p-5">

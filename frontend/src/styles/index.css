@@ -148,6 +148,10 @@ input {
   transform: translateY(-1px);
 }
 
+.panel-filters {
+  overflow: visible;
+}
+
 .panel-header {
   display: flex;
   align-items: flex-start;
@@ -268,6 +272,10 @@ input {
   transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
 }
 
+.ui-select {
+  min-height: 2.75rem;
+}
+
 .ui-input:hover,
 .ui-select:hover {
   border-color: var(--border-strong);
@@ -346,6 +354,97 @@ input {
 
 .ui-button:active:not(:disabled) {
   transform: translateY(0);
+}
+
+.import-export-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.import-export-trigger {
+  justify-content: flex-start;
+  min-height: 2.75rem;
+}
+
+.import-export-menu {
+  position: fixed;
+  z-index: 1400;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: #ffffff;
+  box-shadow: var(--shadow-md);
+  padding: 0.45rem;
+  max-height: min(70vh, 26rem);
+  overflow-y: auto;
+}
+
+.import-export-heading {
+  color: var(--text-soft);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.42rem 0.54rem 0.22rem;
+  text-transform: uppercase;
+}
+
+.import-export-item {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 0.62rem;
+  background: #ffffff;
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: left;
+  padding: 0.52rem 0.56rem;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.import-export-item:hover:not(:disabled),
+.import-export-item:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+  outline: none;
+}
+
+.import-export-item:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.import-export-source {
+  color: var(--text-soft);
+  font-size: 0.79rem;
+  font-weight: 600;
+}
+
+.import-export-status {
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  padding: 0.52rem 0.62rem;
+}
+
+.import-export-status-success {
+  border-color: #bde9dd;
+  background: #effcf7;
+  color: #0d6b5f;
+}
+
+.import-export-status-error {
+  border-color: #f4c1c5;
+  background: #fff4f5;
+  color: #b32d3e;
+}
+
+.import-export-status-info {
+  border-color: #bfd2ed;
+  background: #eef5ff;
+  color: #18408b;
 }
 
 .ui-status-tag {

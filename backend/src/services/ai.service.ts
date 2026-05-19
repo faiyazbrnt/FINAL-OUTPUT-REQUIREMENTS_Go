@@ -1,5 +1,6 @@
 import axios, { type AxiosError } from "axios";
 import { env } from "../config/env";
+import { buildInsightPromptConversation, type PromptMessage } from "./aiPromptBuilder.service";
 import { AppError } from "../utils/httpError";
 
 type AiProvider = "gemini" | "groq";
@@ -12,15 +13,26 @@ type StructuredInsight = {
   wordCount: number;
 };
 
+type InsightReport = {
+  executiveSummary: string;
+  keyFindings: string[];
+  riskAreas: string[];
+  recommendations: string[];
+  confidenceNotes: string;
+};
+
 type NormalizedInsightPayload = {
   insight: string;
   structuredInsights: StructuredInsight[];
   recommendations: string[];
+  report: InsightReport;
 };
 
 const insightTitleOrder: InsightTitle[] = ["Key Trend", "Top Driver", "Potential Anomaly"];
 
 const fallbackRecommendationMessage = "No actionable recommendations available for this dataset.";
+const MIN_FINDING_LENGTH = 14;
+const AI_RESPONSE_TIMEOUT_MS = 20_000;
 
 const isMissingOrPlaceholder = (value: string, placeholders: string[]): boolean => {
   if (!value) {
@@ -187,6 +199,48 @@ const extractRecommendations = (rawBlock: string): string[] => {
   return [...unique.values()].slice(0, 3);
 };
 
+const cleanList = (values: unknown, maxItems: number): string[] => {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  const unique = new Map<string, string>();
+  for (const value of values) {
+    if (typeof value !== "string") {
+      continue;
+    }
+
+    const cleaned = sanitizeDescription(value);
+    if (cleaned.length < MIN_FINDING_LENGTH) {
+      continue;
+    }
+
+    const key = normalizeWhitespace(cleaned).toLowerCase();
+    if (!unique.has(key)) {
+      unique.set(key, normalizeWhitespace(cleaned));
+    }
+  }
+
+  return [...unique.values()].slice(0, maxItems);
+};
+
+const parseJsonFromAiText = (rawText: string): Partial<InsightReport> | null => {
+  const cleaned = sanitizeMarkdownArtifacts(rawText).replace(/^json\s*/i, "");
+  const jsonStart = cleaned.indexOf("{");
+  const jsonEnd = cleaned.lastIndexOf("}");
+
+  if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
+    return null;
+  }
+
+  const candidate = cleaned.slice(jsonStart, jsonEnd + 1);
+  try {
+    return JSON.parse(candidate) as Partial<InsightReport>;
+  } catch {
+    return null;
+  }
+};
+
 const extractStructuredFromText = (rawText: string): { structuredInsights: StructuredInsight[]; recommendations: string[] } => {
   const normalizedText = normalizeForParsing(rawText);
 
@@ -336,16 +390,100 @@ const buildLocalInsightPayload = (summary: unknown, maxWords: number): Normalize
           `Review interactions between fare (${avgFare}) and age (${avgAge}) against class outcome differences to confirm whether confounding variables are inflating the trend.`
         ];
 
+  const report: InsightReport = {
+    executiveSummary: `Survival is ${survivalRate}% with class-level outcomes led by ${topClass}, while regional and age-band variation suggests targeted operational review opportunities.`,
+    keyFindings: structuredInsights.map((item) => item.description).slice(0, 3),
+    riskAreas: [
+      `${topRegionName} shows ${topRegionRate}% survival against ${topRegionShare}% passenger share; verify sample balance and embarkation data quality.`,
+      `${ageBandName} leads at ${ageBandRate}% survival, which may indicate cohort concentration effects rather than broad trend stability.`
+    ],
+    recommendations: recommendationAugmentation.slice(0, 3),
+    confidenceNotes:
+      "Confidence is moderate because conclusions rely on aggregated slices without row-level causality testing; recommendations should be validated with deeper segmentation."
+  };
+
   return {
     insight: trimToWordLimit(composeInsightText(structuredInsights, recommendationAugmentation), maxWords),
     structuredInsights,
-    recommendations: recommendationAugmentation.slice(0, 3)
+    recommendations: recommendationAugmentation.slice(0, 3),
+    report
+  };
+};
+
+const buildReportFromExistingSections = (
+  structuredInsights: StructuredInsight[],
+  recommendations: string[],
+  fallbackReport: InsightReport
+): InsightReport => {
+  const keyFindings = cleanList(
+    [
+      ...structuredInsights.map((item) => item.description),
+      fallbackReport.keyFindings[0],
+      fallbackReport.keyFindings[1],
+      fallbackReport.keyFindings[2]
+    ],
+    4
+  );
+
+  const riskAreas = cleanList(
+    [structuredInsights[2]?.description, fallbackReport.riskAreas[0], fallbackReport.riskAreas[1]],
+    3
+  );
+
+  const finalRecommendations = cleanList(recommendations, 3);
+  return {
+    executiveSummary: structuredInsights[0]?.description || fallbackReport.executiveSummary,
+    keyFindings: keyFindings.length > 0 ? keyFindings : fallbackReport.keyFindings,
+    riskAreas: riskAreas.length > 0 ? riskAreas : fallbackReport.riskAreas,
+    recommendations: finalRecommendations.length > 0 ? finalRecommendations : fallbackReport.recommendations,
+    confidenceNotes: fallbackReport.confidenceNotes
+  };
+};
+
+const buildStructuredInsightsFromReport = (report: InsightReport, fallback: StructuredInsight[]): StructuredInsight[] => {
+  const keyTrend = report.keyFindings[0] || report.executiveSummary || fallback[0]?.description || "";
+  const topDriver = report.keyFindings[1] || fallback[1]?.description || keyTrend;
+  const anomaly = report.riskAreas[0] || report.keyFindings[2] || fallback[2]?.description || keyTrend;
+
+  return [
+    withWordCount("Key Trend", keyTrend),
+    withWordCount("Top Driver", topDriver),
+    withWordCount("Potential Anomaly", anomaly)
+  ];
+};
+
+const normalizeStructuredReport = (
+  rawReport: Partial<InsightReport> | null,
+  fallbackPayload: NormalizedInsightPayload
+): InsightReport => {
+  if (!rawReport) {
+    return fallbackPayload.report;
+  }
+
+  const executiveSummary = sanitizeDescription(rawReport.executiveSummary ?? "");
+  const keyFindings = cleanList(rawReport.keyFindings ?? [], 4);
+  const riskAreas = cleanList(rawReport.riskAreas ?? [], 3);
+  const recommendations = cleanList(rawReport.recommendations ?? [], 3);
+  const confidenceNotes = sanitizeDescription(rawReport.confidenceNotes ?? "");
+
+  if (!executiveSummary || keyFindings.length === 0) {
+    return fallbackPayload.report;
+  }
+
+  return {
+    executiveSummary,
+    keyFindings,
+    riskAreas: riskAreas.length > 0 ? riskAreas : fallbackPayload.report.riskAreas,
+    recommendations: recommendations.length > 0 ? recommendations : fallbackPayload.report.recommendations,
+    confidenceNotes: confidenceNotes || fallbackPayload.report.confidenceNotes
   };
 };
 
 const normalizeAiInsightPayload = (rawInsight: string, summary: unknown, maxWords: number): NormalizedInsightPayload => {
   const { structuredInsights: extractedInsights, recommendations: extractedRecommendations } = extractStructuredFromText(rawInsight);
   const localFallback = buildLocalInsightPayload(summary, maxWords);
+  const parsedReport = parseJsonFromAiText(rawInsight);
+  const normalizedReport = normalizeStructuredReport(parsedReport, localFallback);
 
   // Keep deterministic title order and backfill missing sections so the UI never renders sparse cards.
   const insightByTitle = new Map<InsightTitle, StructuredInsight>();
@@ -361,40 +499,66 @@ const normalizeAiInsightPayload = (rawInsight: string, summary: unknown, maxWord
     }
   }
 
-  const structuredInsights = insightTitleOrder.map((title) => insightByTitle.get(title)).filter((entry): entry is StructuredInsight => Boolean(entry));
+  for (const reportInsight of buildStructuredInsightsFromReport(normalizedReport, localFallback.structuredInsights)) {
+    if (!insightByTitle.has(reportInsight.title)) {
+      insightByTitle.set(reportInsight.title, reportInsight);
+    }
+  }
+
+  const structuredInsights = insightTitleOrder
+    .map((title) => insightByTitle.get(title))
+    .filter((entry): entry is StructuredInsight => Boolean(entry));
 
   const fallbackRecommendations = generateFallbackRecommendations(summary);
   const recommendations =
     extractedRecommendations.length > 0
       ? extractedRecommendations.slice(0, 3)
       : fallbackRecommendations.length > 0
-        ? fallbackRecommendations
-        : localFallback.recommendations;
+      ? fallbackRecommendations
+      : localFallback.recommendations;
+
+  const report = buildReportFromExistingSections(structuredInsights, recommendations, normalizedReport);
 
   return {
     insight: trimToWordLimit(composeInsightText(structuredInsights, recommendations), maxWords),
     structuredInsights,
-    recommendations
+    recommendations,
+    report
   };
 };
 
-const generateWithGemini = async (prompt: string): Promise<string> => {
+const logPromptDebug = (provider: AiProvider, debugPrompt: string): void => {
+  if (env.NODE_ENV === "production") {
+    return;
+  }
+
+  console.debug(`[AI Prompt][${provider}] ${debugPrompt}`);
+};
+
+const generateWithGemini = async (messages: PromptMessage[]): Promise<string> => {
   if (isMissingOrPlaceholder(env.GEMINI_API_KEY, ["your_gemini_api_key", "YOUR_GEMINI_API_KEY"])) {
     throw new AppError("Gemini API key is missing. Set GEMINI_API_KEY in .env.local", 500, "AI_NOT_CONFIGURED");
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent`;
+  const [system, ...conversation] = messages;
+  const contents = conversation.map((message) => ({
+    role: message.role === "assistant" ? "model" : "user",
+    parts: [{ text: message.content }]
+  }));
+
   const response = await axios.post(
     url,
     {
-      contents: [{ role: "user", parts: [{ text: prompt }] }]
+      systemInstruction: { parts: [{ text: system?.content ?? "" }] },
+      contents
     },
     {
       headers: {
         "Content-Type": "application/json",
         "x-goog-api-key": env.GEMINI_API_KEY
       },
-      timeout: 15_000
+      timeout: AI_RESPONSE_TIMEOUT_MS
     }
   );
 
@@ -406,7 +570,7 @@ const generateWithGemini = async (prompt: string): Promise<string> => {
   return text;
 };
 
-const generateWithGroq = async (prompt: string): Promise<string> => {
+const generateWithGroq = async (messages: PromptMessage[]): Promise<string> => {
   if (isMissingOrPlaceholder(env.GROQ_API_KEY, ["your_groq_api_key", "YOUR_GROQ_API_KEY"])) {
     throw new AppError("Groq API key is missing. Set GROQ_API_KEY in .env.local", 500, "AI_NOT_CONFIGURED");
   }
@@ -415,15 +579,15 @@ const generateWithGroq = async (prompt: string): Promise<string> => {
     "https://api.groq.com/openai/v1/chat/completions",
     {
       model: env.GROQ_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3
+      messages: messages.map((message) => ({ role: message.role, content: message.content })),
+      temperature: 0.2
     },
     {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${env.GROQ_API_KEY}`
       },
-      timeout: 15_000
+      timeout: AI_RESPONSE_TIMEOUT_MS
     }
   );
 
@@ -455,12 +619,12 @@ const hasAnyProviderKey = (): boolean => {
   return providerHasUsableKey("gemini") || providerHasUsableKey("groq");
 };
 
-const runWithRetry = async (provider: AiProvider, prompt: string): Promise<string> => {
+const runWithRetry = async (provider: AiProvider, messages: PromptMessage[]): Promise<string> => {
   const generate = provider === "groq" ? generateWithGroq : generateWithGemini;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      return await generate(prompt);
+      return await generate(messages);
     } catch (error) {
       if (attempt === 0 && shouldRetry(error)) {
         await delay(700);
@@ -475,31 +639,20 @@ const runWithRetry = async (provider: AiProvider, prompt: string): Promise<strin
 };
 
 export const buildInsightPrompt = (summary: unknown, maxWords: number): string => {
-  return [
-    "You are a business analyst for DataInsights Corp.",
-    "Analyze this Titanic passenger analytics summary:",
-    JSON.stringify(summary, null, 2),
-    "Return plain text with exactly these sections and no markdown symbols:",
-    "Key Trend:",
-    "Top Driver:",
-    "Potential Anomaly:",
-    "Actionable Recommendations:",
-    "- recommendation 1",
-    "- recommendation 2",
-    "- recommendation 3",
-    "Rules:",
-    "1) Never use **, ##, or standalone bullet markers without text.",
-    "2) Actionable Recommendations must include at least 1 and at most 3 practical recommendations.",
-    "3) Recommendations must be context-aware and based on the provided dataset summary.",
-    `4) Keep the response concise and under ${maxWords} words.`
-  ].join("\n");
+  return buildInsightPromptConversation(summary, maxWords).debugPrompt;
 };
 
 export const generateAiInsight = async (
   summary: unknown,
   maxWords: number
-): Promise<{ insight: string; fallbackUsed: boolean; structuredInsights: StructuredInsight[]; recommendations: string[] }> => {
-  const prompt = buildInsightPrompt(summary, maxWords);
+): Promise<{
+  insight: string;
+  fallbackUsed: boolean;
+  structuredInsights: StructuredInsight[];
+  recommendations: string[];
+  report: InsightReport;
+}> => {
+  const promptConversation = buildInsightPromptConversation(summary, maxWords);
   const providerOrder = getProviderOrder();
   const errors: string[] = [];
 
@@ -509,20 +662,23 @@ export const generateAiInsight = async (
       insight: localPayload.insight,
       fallbackUsed: true,
       structuredInsights: localPayload.structuredInsights,
-      recommendations: localPayload.recommendations
+      recommendations: localPayload.recommendations,
+      report: localPayload.report
     };
   }
 
   try {
     for (const provider of providerOrder) {
       try {
-        const insight = await runWithRetry(provider, prompt);
+        logPromptDebug(provider, promptConversation.debugPrompt);
+        const insight = await runWithRetry(provider, promptConversation.messages);
         const normalizedPayload = normalizeAiInsightPayload(insight, summary, maxWords);
         return {
           insight: normalizedPayload.insight,
           fallbackUsed: false,
           structuredInsights: normalizedPayload.structuredInsights,
-          recommendations: normalizedPayload.recommendations
+          recommendations: normalizedPayload.recommendations,
+          report: normalizedPayload.report
         };
       } catch (error) {
         errors.push(formatProviderError(provider, error));
@@ -537,7 +693,8 @@ export const generateAiInsight = async (
       insight: localPayload.insight,
       fallbackUsed: true,
       structuredInsights: localPayload.structuredInsights,
-      recommendations: localPayload.recommendations
+      recommendations: localPayload.recommendations,
+      report: localPayload.report
     };
   }
 };
